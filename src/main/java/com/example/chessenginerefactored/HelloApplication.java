@@ -143,6 +143,7 @@ public class HelloApplication extends Application {
         // For now, only Pawn is implemented; others return null or a placeholder
         return switch (type.charAt(0)) {
             case 'p' -> new Pawn(type, row, col);
+            case 'n' -> new Knight(type, row, col);
             default -> new Pawn(type, row, col); // Temporary placeholder for other pieces
         };
     }
