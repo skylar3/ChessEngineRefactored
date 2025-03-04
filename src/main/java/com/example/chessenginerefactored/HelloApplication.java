@@ -146,6 +146,7 @@ public class HelloApplication extends Application {
             case 'n' -> new Knight(type, row, col);
             case 'q' -> new Queen(type, row, col);
             case 'r' -> new Rook(type, row, col);
+            case 'b' -> new Bishop(type, row, col);
             default -> new Pawn(type, row, col); // Temporary placeholder for other pieces
         };
     }
