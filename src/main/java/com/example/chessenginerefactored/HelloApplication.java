@@ -5,6 +5,9 @@ import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.TransferMode;
 import javafx.scene.layout.GridPane;
 import javafx.stage.Stage;
 
@@ -30,10 +33,13 @@ public class HelloApplication extends Application {
         root.getChildren().addAll(createChessBoardImage(), chessBoardLayout);
 
         // Example: Initial game state (standard chess starting position)
-        String initialGameState = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
+        String gameState = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"; // Corrected to standard position
 
         // Load the pieces based on the game state string
-        loadGameFromString(initialGameState, chessBoardLayout);
+        loadGameFromString(gameState, chessBoardLayout);
+
+        // Enable drag-and-drop on the entire board
+        enableBoardDragAndDrop(chessBoardLayout);
 
         // Set scene
         Scene scene = new Scene(root, 600, 600);
@@ -86,7 +92,9 @@ public class HelloApplication extends Application {
             ImageView pieceImageView = new ImageView(pieceImage);
             pieceImageView.setFitWidth(75);
             pieceImageView.setFitHeight(75);
+            pieceImageView.setUserData(piece); // Store piece type
             board.add(pieceImageView, col, row);
+            enablePieceDrag(pieceImageView, board); // Enable dragging for this piece
         }
     }
 
@@ -115,22 +123,22 @@ public class HelloApplication extends Application {
                     String piece;
                     if (Character.isUpperCase(currentChar)) { // White pieces
                         piece = switch (currentChar) {
-                            case 'K' -> "kw"; // White King
-                            case 'Q' -> "qw"; // White Queen
-                            case 'R' -> "rw"; // White Rook
-                            case 'B' -> "bw"; // White Bishop
-                            case 'N' -> "nw"; // White Knight
-                            case 'P' -> "pw"; // White Pawn
+                            case 'K' -> "kw";
+                            case 'Q' -> "qw";
+                            case 'R' -> "rw";
+                            case 'B' -> "bw";
+                            case 'N' -> "nw";
+                            case 'P' -> "pw";
                             default -> null;
                         };
                     } else { // Black pieces (lowercase)
                         piece = switch (currentChar) {
-                            case 'k' -> "kb"; // Black King
-                            case 'q' -> "qb"; // Black Queen
-                            case 'r' -> "rb"; // Black Rook
-                            case 'b' -> "bb"; // Black Bishop
-                            case 'n' -> "nb"; // Black Knight
-                            case 'p' -> "pb"; // Black Pawn
+                            case 'k' -> "kb";
+                            case 'q' -> "qb";
+                            case 'r' -> "rb";
+                            case 'b' -> "bb";
+                            case 'n' -> "nb";
+                            case 'p' -> "pb";
                             default -> null;
                         };
                     }
@@ -142,5 +150,74 @@ public class HelloApplication extends Application {
                 }
             }
         }
+    }
+
+    // Enable dragging for a specific piece
+    private void enablePieceDrag(ImageView pieceImageView, GridPane board) {
+        pieceImageView.setOnDragDetected(event -> {
+            Dragboard db = pieceImageView.startDragAndDrop(TransferMode.MOVE);
+            ClipboardContent content = new ClipboardContent();
+            content.putString((String) pieceImageView.getUserData()); // Piece type
+            db.setContent(content);
+            db.setDragView(pieceImageView.getImage(), 37.5, 37.5); // Center the drag image
+            event.consume();
+        });
+    }
+
+    // Enable drag-and-drop on the entire board
+    private void enableBoardDragAndDrop(GridPane chessBoardLayout) {
+        chessBoardLayout.setOnDragOver(event -> {
+            if (event.getGestureSource() instanceof ImageView && event.getDragboard().hasString()) {
+                event.acceptTransferModes(TransferMode.MOVE);
+            }
+            event.consume();
+        });
+
+        chessBoardLayout.setOnDragDropped(event -> {
+            Dragboard db = event.getDragboard();
+            boolean success = false;
+
+            if (db.hasString()) {
+                ImageView draggedPiece = (ImageView) event.getGestureSource();
+                int startRow = GridPane.getRowIndex(draggedPiece);
+                int startCol = GridPane.getColumnIndex(draggedPiece);
+
+                // Calculate target position based on drop coordinates
+                double squareSize = 75;
+                int targetRow = (int) (event.getY() / squareSize);
+                int targetCol = (int) (event.getX() / squareSize);
+
+                // Ensure target is within bounds
+                if (targetRow >= 0 && targetRow < 8 && targetCol >= 0 && targetCol < 8) {
+                    // Remove piece from old position
+                    chessBoardLayout.getChildren().remove(draggedPiece);
+
+                    // If target square is occupied, remove the piece there
+                    ImageView targetPiece = getPieceAt(chessBoardLayout, targetRow, targetCol);
+                    if (targetPiece != null) {
+                        chessBoardLayout.getChildren().remove(targetPiece);
+                    }
+
+                    // Move the dragged piece to the new position
+                    chessBoardLayout.add(draggedPiece, targetCol, targetRow);
+                    success = true;
+                }
+            }
+
+            event.setDropCompleted(success);
+            event.consume();
+        });
+
+        // Optional: Reset piece position if drag fails
+        chessBoardLayout.setOnDragDone(event -> {
+            if (!event.isDropCompleted()) {
+                ImageView draggedPiece = (ImageView) event.getGestureSource();
+                int startRow = GridPane.getRowIndex(draggedPiece);
+                int startCol = GridPane.getColumnIndex(draggedPiece);
+                chessBoardLayout.getChildren().remove(draggedPiece);
+                chessBoardLayout.add(draggedPiece, startCol, startRow); // Return to original position
+            }
+            event.consume();
+        });
     }
 }
