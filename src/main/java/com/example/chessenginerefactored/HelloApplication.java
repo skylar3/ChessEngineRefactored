@@ -144,6 +144,8 @@ public class HelloApplication extends Application {
         return switch (type.charAt(0)) {
             case 'p' -> new Pawn(type, row, col);
             case 'n' -> new Knight(type, row, col);
+            case 'q' -> new Queen(type, row, col);
+            case 'r' -> new Rook(type, row, col);
             default -> new Pawn(type, row, col); // Temporary placeholder for other pieces
         };
     }
@@ -198,6 +200,8 @@ public class HelloApplication extends Application {
                         boardState[targetRow][targetCol] = piece;
                         piece.updatePosition(targetRow, targetCol);
                         System.out.println("Updated game state: " + getGameState());
+                       String roundNumberMessage =  (roundNumber % 2 == 0 ) ? "Blacks turn" :"Whites turn";
+                       System.out.println(roundNumberMessage);
                         success = true;
                         roundNumber = roundNumber + 1;
                     }
