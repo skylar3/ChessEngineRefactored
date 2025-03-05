@@ -3,23 +3,26 @@ package com.example.chessenginerefactored;
 import javafx.application.Application;
 import javafx.scene.Group;
 import javafx.scene.Scene;
+import javafx.scene.effect.DropShadow;
+import javafx.scene.effect.Glow;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.GridPane;
+import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-
 public class HelloApplication extends Application {
 
     private final Map<String, Image> pieceImages = new HashMap<>();
-    private Piece[][] boardState = new Piece[8][8]; // Updated to use Piece interface
+    private Piece[][] boardState = new Piece[8][8];
+    private ImageView selectedPiece = null;
     int roundNumber = 0;
 
     @Override
@@ -83,7 +86,7 @@ public class HelloApplication extends Application {
             ImageView pieceImageView = new ImageView(pieceImage);
             pieceImageView.setFitWidth(75);
             pieceImageView.setFitHeight(75);
-            pieceImageView.setUserData(piece); // Store the Piece object
+            pieceImageView.setUserData(piece);
             board.add(pieceImageView, col, row);
             enablePieceDrag(pieceImageView, board);
         }
@@ -111,7 +114,6 @@ public class HelloApplication extends Application {
             int colIndex = 0;
             for (int i = 0; i < row.length(); i++) {
                 char currentChar = row.charAt(i);
-
                 if (Character.isDigit(currentChar)) {
                     colIndex += Character.getNumericValue(currentChar);
                 } else {
@@ -140,25 +142,39 @@ public class HelloApplication extends Application {
     }
 
     private Piece createPiece(String type, int row, int col) {
-        // For now, only Pawn is implemented; others return null or a placeholder
         return switch (type.charAt(0)) {
             case 'p' -> new Pawn(type, row, col);
             case 'n' -> new Knight(type, row, col);
             case 'q' -> new Queen(type, row, col);
             case 'r' -> new Rook(type, row, col);
             case 'b' -> new Bishop(type, row, col);
-            default -> new Pawn(type, row, col); // Temporary placeholder for other pieces
+            case 'k' -> new King(type, row, col);
+            default -> throw new IllegalArgumentException("Unknown piece type: " + type);
         };
     }
 
     private void enablePieceDrag(ImageView pieceImageView, GridPane board) {
+        Glow glowEffect = new Glow(0.8);
+        DropShadow dropShadow = new DropShadow(0.8, Color.AQUA);
+
         pieceImageView.setOnDragDetected(event -> {
+            selectedPiece = pieceImageView;
+            selectedPiece.setEffect(glowEffect);
+            selectedPiece.setEffect(dropShadow);
             Dragboard db = pieceImageView.startDragAndDrop(TransferMode.MOVE);
             ClipboardContent content = new ClipboardContent();
             content.putString(((Piece) pieceImageView.getUserData()).getType());
             db.setContent(content);
             db.setDragView(pieceImageView.getImage(), 37.5, 37.5);
             event.consume();
+        });
+
+        pieceImageView.setOnMousePressed(event -> {
+            if (selectedPiece != null) {
+                selectedPiece.setEffect(null);
+            }
+            selectedPiece = pieceImageView;
+            selectedPiece.setEffect(glowEffect);
         });
     }
 
@@ -183,30 +199,75 @@ public class HelloApplication extends Application {
                 double squareSize = 75;
                 int targetRow = (int) (event.getY() / squareSize);
                 int targetCol = (int) (event.getX() / squareSize);
-                if ((piece.isWhite() && roundNumber %2 == 0) || (!piece.isWhite() && roundNumber %2 == 1))
-                {
-                if (targetRow >= 0 && targetRow < 8 && targetCol >= 0 && targetCol < 8) {
-                    // Validate move using piece logic
-                    if (piece.isValidMove(targetRow, targetCol, boardState)) {
-                        chessBoardLayout.getChildren().remove(draggedPiece);
-                        ImageView targetPiece = getPieceAt(chessBoardLayout, targetRow, targetCol);
-                        if (targetPiece != null) {
-                            chessBoardLayout.getChildren().remove(targetPiece);
+
+                if ((piece.isWhite() && roundNumber % 2 == 0) || (!piece.isWhite() && roundNumber % 2 == 1)) {
+                    if (targetRow >= 0 && targetRow < 8 && targetCol >= 0 && targetCol < 8) {
+                        if (piece.isValidMove(targetRow, targetCol, boardState)) {
+                            // Simulate the move
+                            Piece originalTarget = boardState[targetRow][targetCol];
+                            boardState[startRow][startCol] = null;
+                            boardState[targetRow][targetCol] = piece;
+                            piece.updatePosition(targetRow, targetCol);
+
+                            // Check if own king is in check
+                            boolean ownKingInCheck = isKingInCheck(piece.isWhite());
+
+                            // Undo simulation
+                            boardState[startRow][startCol] = piece;
+                            boardState[targetRow][targetCol] = originalTarget;
+                            piece.updatePosition(startRow, startCol);
+
+                            if (!ownKingInCheck) {
+                                chessBoardLayout.getChildren().remove(draggedPiece);
+                                ImageView targetPiece = getPieceAt(chessBoardLayout, targetRow, targetCol);
+                                if (targetPiece != null) {
+                                    chessBoardLayout.getChildren().remove(targetPiece);
+                                }
+
+                                // Handle castling
+                                if (piece instanceof King && Math.abs(targetCol - startCol) == 2) {
+                                    int rookStartCol = targetCol > startCol ? 7 : 0;
+                                    int rookTargetCol = targetCol > startCol ? startCol + 1 : startCol - 1;
+                                    ImageView rookPiece = getPieceAt(chessBoardLayout, startRow, rookStartCol);
+                                    if (rookPiece != null) {
+                                        chessBoardLayout.getChildren().remove(rookPiece);
+                                        chessBoardLayout.add(rookPiece, rookTargetCol, startRow);
+                                        Piece rook = boardState[startRow][rookStartCol];
+                                        boardState[startRow][rookTargetCol] = rook;
+                                        boardState[startRow][rookStartCol] = null;
+                                        rook.updatePosition(startRow, rookTargetCol);
+                                    }
+                                }
+
+                                chessBoardLayout.add(draggedPiece, targetCol, targetRow);
+                                boardState[startRow][startCol] = null;
+                                boardState[targetRow][targetCol] = piece;
+                                piece.updatePosition(targetRow, targetCol);
+
+                                // Check opponent's king
+                                boolean opponentKingInCheck = isKingInCheck(!piece.isWhite());
+                                String checkMessage = opponentKingInCheck ? " - Check!" : "";
+                                if (opponentKingInCheck) {
+                                    for (int r = 0; r < 8; r++) {
+                                        for (int c = 0; c < 8; c++) {
+                                            if (boardState[r][c] instanceof King && boardState[r][c].isWhite() != piece.isWhite()) {
+                                                ImageView kingView = getPieceAt(chessBoardLayout, r, c);
+                                                if (kingView != null) kingView.setEffect(new DropShadow(20, Color.RED));
+                                            }
+                                        }
+                                    }
+                                }
+
+                                System.out.println("Updated game state: " + getGameState());
+                                String roundNumberMessage = (roundNumber % 2 == 0) ? "Black's turn" : "White's turn";
+                                System.out.println(roundNumberMessage + checkMessage);
+                                roundNumber++;
+                                success = true;
+                            } else {
+                                System.out.println("Illegal move: Leaves king in check!");
+                            }
                         }
-
-                        chessBoardLayout.add(draggedPiece, targetCol, targetRow);
-
-                        // Update board state
-                        boardState[startRow][startCol] = null;
-                        boardState[targetRow][targetCol] = piece;
-                        piece.updatePosition(targetRow, targetCol);
-                        System.out.println("Updated game state: " + getGameState());
-                       String roundNumberMessage =  (roundNumber % 2 == 0 ) ? "Blacks turn" :"Whites turn";
-                       System.out.println(roundNumberMessage);
-                        success = true;
-                        roundNumber = roundNumber + 1;
                     }
-                }
                 }
             }
 
@@ -215,6 +276,10 @@ public class HelloApplication extends Application {
         });
 
         chessBoardLayout.setOnDragDone(event -> {
+            if (selectedPiece != null) {
+                selectedPiece.setEffect(null);
+                selectedPiece = null;
+            }
             if (!event.isDropCompleted()) {
                 ImageView draggedPiece = (ImageView) event.getGestureSource();
                 int startRow = GridPane.getRowIndex(draggedPiece);
@@ -268,5 +333,37 @@ public class HelloApplication extends Application {
             case "pb" -> 'p';
             default -> throw new IllegalArgumentException("Unknown piece: " + piece);
         };
+    }
+
+    // New method to check if a king is in check
+    public boolean isKingInCheck(boolean isWhiteKing) {
+        int kingRow = -1, kingCol = -1;
+        for (int row = 0; row < 8; row++) {
+            for (int col = 0; col < 8; col++) {
+                Piece piece = boardState[row][col];
+                if (piece != null && piece instanceof King && piece.isWhite() == isWhiteKing) {
+                    kingRow = row;
+                    kingCol = col;
+                    break;
+                }
+            }
+            if (kingRow != -1) break;
+        }
+
+        if (kingRow == -1 || kingCol == -1) {
+            throw new IllegalStateException("King not found on the board!");
+        }
+
+        for (int row = 0; row < 8; row++) {
+            for (int col = 0; col < 8; col++) {
+                Piece piece = boardState[row][col];
+                if (piece != null && piece.isWhite() != isWhiteKing) {
+                    if (piece.isValidMove(kingRow, kingCol, boardState)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 }

@@ -38,20 +38,27 @@ public class Knight implements Piece {
         return isWhite;
     }
     @Override
-    public boolean isValidMove(int targetRow, int targetCol, Piece[][] board)
-    {
-        if ((targetCol == col - 1 && (targetRow == (row +2) || targetRow == (row - 2)) ||
-                targetCol == col + 1 && (targetRow == (row+2) || targetRow == (row - 2)) ||
-                ((targetCol == col + 2 || targetCol == col - 2) && (targetRow ==(row + 1) || targetRow == row - 1)) &&
-                        (board[targetRow][targetCol] == null)) )
-        {
-
-            return true;
-        }
-        else {
+    public boolean isValidMove(int targetRow, int targetCol, Piece[][] board) {
+        // If the target is the current position, it's not a valid move
+        if (targetRow == row && targetCol == col) {
             return false;
         }
 
+        // Calculate differences in row and column
+        int rowDiff = Math.abs(targetRow - row);
+        int colDiff = Math.abs(targetCol - col);
+
+        // Knight moves in an L-shape: (2,1) or (1,2)
+        boolean isLShape = (rowDiff == 2 && colDiff == 1) || (rowDiff == 1 && colDiff == 2);
+
+        if (!isLShape) {
+            return false; // Not a valid knight move
+        }
+
+        // Check the target square: empty or contains an opponent's piece
+        Piece targetPiece = board[targetRow][targetCol];
+        return targetPiece == null || targetPiece.isWhite() != isWhite;
     }
 
 }
+
