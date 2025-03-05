@@ -7,6 +7,7 @@ import javafx.scene.effect.DropShadow;
 import javafx.scene.effect.Glow;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.image.WritableImage;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.TransferMode;
@@ -155,12 +156,13 @@ public class HelloApplication extends Application {
 
     private void enablePieceDrag(ImageView pieceImageView, GridPane board) {
         Glow glowEffect = new Glow(0.8);
-        DropShadow dropShadow = new DropShadow(0.8, Color.AQUA);
+        DropShadow dropShadow = new DropShadow(1, Color.AQUA);
 
         pieceImageView.setOnDragDetected(event -> {
             selectedPiece = pieceImageView;
             selectedPiece.setEffect(glowEffect);
             selectedPiece.setEffect(dropShadow);
+            WritableImage snapshot = selectedPiece.snapshot(null, null);
             Dragboard db = pieceImageView.startDragAndDrop(TransferMode.MOVE);
             ClipboardContent content = new ClipboardContent();
             content.putString(((Piece) pieceImageView.getUserData()).getType());
